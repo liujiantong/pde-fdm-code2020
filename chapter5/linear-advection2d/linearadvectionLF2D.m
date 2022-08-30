@@ -1,0 +1,137 @@
+function linearadvectionLF2D
+% File name: linearadvectionLF2D.m
+% Author: Clive Mingham 
+% Date: 19 Oct 2010
+%
+% This m-file is associated with the free text book: 'Introductory Finite Difference 
+% Methods for PDEs' which may be downloaded from
+% http://bookboon.com/uk/student/mathematics/introductory-finite-difference
+% -methods-for-pdes
+%
+% Description: Solves the 2D linear advection equation 
+% dU/dt + vx dU/dx + vy dU/dy = 0,
+% using the 2D Lax-Friedrichs scheme
+% The solution is calculated over [p, q] x [r, s] using NX, NY points
+% in the x and y directions respectively and plotted
+% after ntimesteps time steps, i.e. the final 
+% solution is at time, ntimesteps*dt seconds.
+%
+% Boundary conditions: Dirichlet boundary conditions are used everywhere.
+%
+% Subfunction: gaussian2D
+%
+% Note:
+% This 2D problem has an analytical solution.
+% If initial condition is U(x,0) = f(x, y) then it can be shown
+% that the exact solution is U(x, y, t) = f(x - vx t, y - vy t). 
+% i.e. the initial state is translated (advected) in the x and y directions
+% with speeds vx and vy respectively.
+%
+% Stability analysis for the timestep is very complicated so a heuristic
+% formula has been used based on the 1D case and a safety factor, F.
+clear all; clc; clf
+% First set the initial parameters.
+p=0;                         % start of computational domain in x direction
+q=100;                       % end of computational domain in x direction
+r=0;                         % start of computational domain in y direction
+s=100;                       % end of computational domain in y direction
+vx=0.5;                      % water speed in x direction
+vy=0.5;                      % water speed in y direction
+NX=101;                      % number of grid points in x direction
+NY=101;                      % number of grid points in y direction
+dx=(q-p)/(NX-1);             % spatial step size in x
+dy=(s-r)/(NY-1);             % spatial step size in x
+x=p:dx:q;                    % vector of grid points in x
+y=r:dy:s;                    % vector of grid points in y
+u0=zeros(NX,NY);             % vector of initial u values filled with zeros
+%
+% Insert initial conditions.
+for i=1:NX
+    for j=1:NY
+        u0(i,j)=gaussian2D(x(i),y(j)); 
+    end 
+end          % initial condition loop
+uinit=u0;    % stores initial conditions if needed
+%
+t=0;                           % initial time
+ntimesteps=30;                 % number of time steps
+F=0.4;                         % safety factor
+dt=F*min(dx/abs(vx),dy/abs(vy));
+% heuristic time step calc
+%                                
+Cx=dt*vx/dx;                   % Courant number in the x direction
+Cy=dt*vy/dy;                   % Courant number in the y direction
+% 
+u=zeros(NX,NY);             % define correct sized numerical solution array
+exact=zeros(NX,NY);         % define correct sized exact solution array
+%                              
+% Begin the time marching algorithm
+disp('start time marching ...')
+for timecount=1:ntimesteps
+    t=t+dt;               % current time for outputted solution                   
+    % Insert ghost values.
+    % Each row needs a left hand ghost value.
+    % Each column needs a lower ghost value.
+    % Hence the matrix of u values becomes NX+1 by NY+1 and the 
+    % non-ghost values are in the ranges i = 2 to NX+1, j = 2 to NY+1.
+    % Insert the ghost values assuming the (Dirichlet) conditions of
+    % u0 = 0 at the boundaries at all times.  Extend u0.
+    % This is a quick way.  
+    utemp=zeros(NX+2,NY+2);  % Create a zero matrix of the correct size.
+    utemp(2:NX+1,2:NY+1)=u0; % Embed u0
+    u0=utemp;                % Overwrite u0.
+    clear utemp
+    %
+    for i=2:NX+1
+        for j=2:NY+1
+            dum=(u0(i+1,j)+u0(i-1,j)+u0(i,j+1)+u0(i,j-1))/4;
+            u(i,j)=dum-(Cx/2)*(u0(i+1,j)-u0(i-1,j))-(Cy/2)*(u0(i,j+1)-u0(i,j-1));  % LF scheme in 2D 
+        end
+    end
+    u0=u(2:NX+1,2:NY+1);     % copy solution to initial conditions for next iteration 
+end % of time marching loop
+%
+% Output
+disp('finished time marching')
+disp('see contour plots in graphics window')
+for i=1:NX
+    for j=1:NY
+        exact(i,j)=gaussian2D(x(i)-vx*t,y(j)-vy*t);   % exact solution at time t
+    end   
+end     
+%
+[X,Y]=meshgrid(x,y);   % for contour plots
+%subplot(2,1,1), contour(X,Y,transpose(exact))
+%title('contour plot of exact solution')
+xlabel('x')
+ylabel('y')
+%
+%subplot(2,1,2), contour(X,Y,transpose(u0))
+figure;mesh(X,Y, transpose(u0));
+title('contour plot of LF2D scheme solution')
+xlabel('x')
+ylabel('y')
+%
+disp('program finished')
+%  end of linearadvectionLF2D.m
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function z=gaussian2D(x,y)
+% Initial conditions given by a 2D Gaussian function over [p, q]x[r, s], height 1, centred
+% on (cenx, ceny) which becomes zero rad away from the centre.
+% p, q, r, s specify size of domain
+p=0;
+q=100;
+r=0;
+s=100;
+% cenx, ceny centre for Gaussian
+cenx=(p+q)/2;
+ceny=(r+s)/2;
+% rad is Gaussian 'radius'
+rad=20;
+z=0.0;
+d=sqrt((x-cenx)^2+(y-ceny)^2);   % distance from centre
+if (d < rad)
+  z=exp(-0.01*d^2); 
+end
+% end of function gaussian2D
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -1,0 +1,157 @@
+function linearadvectionFOU2Dsplit
+% File name: linearadvectionFOU2Dsplit.m
+% Author: Clive Mingham 
+% Date: 19 Oct 2010
+%
+% This m-file is associated with the free text book: 'Introductory Finite Difference 
+% Methods for PDEs' which may be downloaded from
+% http://bookboon.com/uk/student/mathematics/introductory-finite-difference
+% -methods-for-pdes
+%
+% Description: Solves the 2D linear advection equation
+% dU/dt + vx dU/dx + vy dU/dy = 0,
+% using operator splitting.
+% 1D operators, LX LY are used (both FOU).  i.e. unew=LY(LX(uold)).
+% The solution is calculated over [p, q] x [r, s] using NX, NY points
+% in the x and y directions respectively and plotted
+% after ntimesteps time steps, i.e. the final 
+% solution is at time, ntimesteps*dt seconds.
+%
+% Boundary conditions: Dirichlet condition is used everywhere.
+%
+% Subfunction: gaussian2D
+%
+% Note:
+% This problem has an analytical solution.
+% If initial condition is u(x,0) = f(x, y) then it can be shown
+% that the exact solution is u(x, y, t) = f(x - vx t, y - vy t). 
+% i.e. the initial state is translated (advected) in the x and y directions
+% with speeds vx and vy respectively.
+%
+% Note:
+% Backward differences only work for positive velocities.  For
+% negative velocities used forward differences.
+clear all; clc; clf
+% First set the initial parameters.
+p=0;                         % start of computational domain in x direction
+q=100;                       % end of computational domain in x direction
+r=0;                         % start of computational domain in y direction
+s=100;                       % end of computational domain in y direction
+vx=0.5;                      % water speed in x direction
+vy=0.5;                      % water speed in y direction
+NX=101;                      % number of grid points in x direction
+NY=101;                      % number of grid points in y direction
+dx=(q-p)/(NX-1);             % spatial step size in x
+dy=(s-r)/(NY-1);             % spatial step size in y
+x=p:dx:q;                    % vector of grid points in x
+y=r:dy:s;                    % vector of grid points in y
+u0=zeros(NX,NY);             % vector of initial u values filled with zeros
+% Insert initial conditions.
+for i=1:NX
+    for j=1:NY
+        u0(i,j)=gaussian2D(x(i),y(j)); 
+    end 
+end          % initial condition loop
+uinit=u0;    % stores initial conditions
+%
+t=0;                           % initial time
+ntimesteps=30;                 % number of time steps
+% Courx=0.95;                    % Courant number in x direction
+% Coury=0.95;                    % Courant number in y direction
+% dtx=Courx*dx/abs(vx);          % time step for LX operator
+% dty=Coury*dy/abs(vy);          % time step for LY operator
+%dt=min(dtx,dty)     
+
+F=0.4;    
+vx=0.5;
+vy=0.5;% safety factor
+dt=F*min(dx/abs(vx),dy/abs(vy))  % heuristic time step calc
+% choose min time step for stability
+Courx=vx*dt/dx;                % redefine the Courant numbers
+Coury=vy*dt/dy;
+% 
+u=zeros(NX,NY);                % define correct sized numerical solution array
+exact=zeros(NX,NY);            % define correct sized exact solution array
+%                              
+% Begin the time marching algorithm
+disp('start time marching ...')
+for timestep=1:ntimesteps
+    timestep;
+    t=t+dt;               % current time for outputted solution                 
+    % Insert ghost values for boundary conditions.
+    % Each row needs a left hand ghost value for FOU scheme (vx >0).
+    % Each column needs a lower ghost value for FOU scheme (vy > 0).
+    % Hence the matrix of u values becomes NX+1 by NY+1 and the 
+    % non-ghost values are in the ranges i = 2 to NX+1, j = 2 to NY+1.
+    % Insert the ghost values assuming the (Dirichlet) conditions of
+    % u0 = 0 at the boundaries at all times.  Extend u0.
+    % This is a quick way.
+    utemp=zeros(NX+1,NY+1);  % Create a zero matrix of the correct size.
+    utemp(2:NX+1,2:NY+1)=u0; % Embed u0
+    u0=utemp;                % Overwrite u0.
+    %
+    % LX operator (x-sweep)
+    for j=2:NY+1
+        for i=2:NX+1
+            utemp(i,j)=u0(i,j)-Courx*(u0(i,j)-u0(i-1,j));  % FOU scheme in 1D 
+        end
+    end
+    % utemp stores intermediate results which already have 0 BCS in them
+    % LY operator (y-sweep)
+    for i=2:NX+1
+        for j=2:NY+1
+            u(i,j)=utemp(i,j)-Coury*(utemp(i,j)-utemp(i,j-1));  % FOU scheme in 1D 
+        end
+    end
+    %
+    u0=u(2:NX+1,2:NY+1);     % copy solution to initial conditions for next iteration  
+    %   
+end
+disp('program ends')
+% Output
+for i=1:NX
+    for j=1:NY
+        exact(i,j)=gaussian2D(x(i)-vx*t,y(j)-vy*t);   % exact solution at time t
+    end   
+end 
+%
+[X,Y]=meshgrid(x,y);    % for plot
+%subplot(2,1,1), contour(X,Y,transpose(exact))
+%figure; mesh(X,Y, transpose(exact));
+title('exact solution to du/dt + vx du/dx + vy du/dy = 0')
+xlabel('x')
+ylabel('y')
+%
+%subplot(2,1,2), contour(X,Y,transpose(u0))
+figure; mesh(X,Y, transpose(u0));
+title('numerical solution to dU/dt + vx dU/dx + vy dU/dy = 0')
+xlabel('x')
+ylabel('y')    
+
+%figure; mesh(X,Y, transpose(u0-exact));
+title('numerical solution to dU/dt + vx dU/dx + vy dU/dy = 0')
+xlabel('x')
+ylabel('y')    
+
+% end of linearadvectionFOU2Dsplit.m
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function z=gaussian2D(x,y)
+% 2D Gaussian function over [p, q]x[r, s], height 1, centred
+% on (cenx, ceny) which becomes zero rad away from the centre.
+% p, q, r, s specify size of domain
+p=0;
+q=100;
+r=0;
+s=100;
+% cenx, ceny centre for Gaussian
+cenx=(p+q)/2;
+ceny=(r+s)/2;
+% rad is Gaussian 'radius'
+rad=20 ;
+z=0.0;
+d=sqrt((x-cenx)^2+(y-ceny)^2);   % distance from centre
+if (d < rad)
+   z=exp(-0.01*d^2); 
+end
+% end of sub function gaussian2D
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
